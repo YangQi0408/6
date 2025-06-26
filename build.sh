@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-TOOLCHAIN_PATH=$HOME/prelude-clang/bin
+TOOLCHAIN_PATH=$HOME/android/toolchains/zyc-clang/bin
 echo "TOOLCHAIN_PATH: [$TOOLCHAIN_PATH]"
 export PATH="$TOOLCHAIN_PATH:$PATH"
 export CCACHE_DIR="$HOME/.cache/ccache_mi9kernel" 
