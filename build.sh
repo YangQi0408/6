@@ -1,28 +1,67 @@
 #!/bin/bash
-set -e
 
-TOOLCHAIN_PATH=$HOME/android/toolchains/zyc-clang/bin
-echo "TOOLCHAIN_PATH: [$TOOLCHAIN_PATH]"
+ANYKERNEL3_DIR=$PWD/AnyKernel/
+FINAL_KERNEL_ZIP=anykernel3_cepheus.zip
+
+TOOLCHAIN_PATH="/home/yangqi/toolchains/zyc-clang/bin"
+
+export LLVM=1
+export USE_CCACHE=1
 export PATH="$TOOLCHAIN_PATH:$PATH"
-export CCACHE_DIR="$HOME/.cache/ccache_mi9kernel" 
-export PATH="/usr/lib/ccache:$PATH"
+export CCACHE_DIR="$HOME/.cache/ccache_xm9kernel" 
+export PATH="/usr/bin/ccache:$PATH"
 echo "CCACHE_DIR: [$CCACHE_DIR]"
 
-MAKE_ARGS="AS=as LD=ld.lld ARCH=arm64 SUBARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+ccache --version
+ccache -s
+clang -v
+which clang
 
-echo "[clang --version]:"
-clang --version
+MAKE_ARGS="AR=llvm-ar \
+        AS=as \
+        ARCH=arm64 \
+        SUBARCH=arm64 \
+        O=out \AR=llvm-ar \
+        LD=ld.lld \
+        NM=llvm-nm \
+        OBJCOPY=llvm-objcopy \
+        OBJDUMP=llvm-objdump \
+        STRIP=llvm-strip \
+        CROSS_COMPILE=aarch64-linux-gnu- \
+        CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+        CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+        CLANG_TRIPLE=aarch64-linux-gnu-"
 
-make CC="ccache clang" CXX="ccache clang++" $MAKE_ARGS cepheus_defconfig
+make AS=as CC="ccache clang" CXX="ccache clang++" $MAKE_ARGS cepheus_defconfig -j12
 
-make CC="ccache clang" CXX="ccache clang++" $MAKE_ARGS -j$(nproc)
+START=$(date +"%s")
 
-sleep 2
-rm -rf out/repack; 
-mkdir out/repack; sleep 2
-echo "Repacking..."
-unzip release.zip -d out/repack
-cp out/arch/arm64/boot/Image out/repack/Image
-cd out/repack; zip -r kernel.zip *; cd ../../
-md5=$(md5sum out/repack/kernel.zip | cut -c1-8)
-mv out/repack/kernel.zip anykernel3_cepheus_$(date +%Y%m%d)_$md5.zip
+make AS=as CC="ccache clang" CXX="ccache clang++" $MAKE_ARGS -j12
+
+echo -e "$yellow**** Verify Image.gz-dtb ****$nocol"
+ls $PWD/out/arch/arm64/boot/Image.gz-dtb
+
+echo -e "$yellow**** Verifying AnyKernel3 Directory ****$nocol"
+ls $ANYKERNEL3_DIR
+echo -e "$yellow**** Removing leftovers ****$nocol"
+rm -rf $ANYKERNEL3_DIR/Image.gz-dtb
+rm -rf $ANYKERNEL3_DIR/$FINAL_KERNEL_ZIP
+
+echo -e "$yellow**** Copying Image.gz-dtb ****$nocol"
+cp $PWD/out/arch/arm64/boot/Image.gz-dtb $ANYKERNEL3_DIR/
+
+echo -e "$yellow**** Time to zip up! ****$nocol"
+cd $ANYKERNEL3_DIR/
+zip -r9 $FINAL_KERNEL_ZIP * -x README $FINAL_KERNEL_ZIP
+cp $ANYKERNEL3_DIR/$FINAL_KERNEL_ZIP /home/yangqi/kernel/$FINAL_KERNEL_ZIP
+
+echo -e "$yellow**** Done, here is your checksum ****$nocol"
+cd ..
+rm -rf $ANYKERNEL3_DIR/$FINAL_KERNEL_ZIP
+rm -rf $ANYKERNEL3_DIR/Image.gz-dtb
+rm -rf out/
+
+END=$(date +"%s")
+DIFF=$((END - START))
+echo -e '\033[01;32m' "Kernel compiled successfully in $((DIFF / 60)) minute(s) and $((DIFF % 60)) seconds" || exit
+sha1sum $KERNELDIR/$FINAL_KERNEL_ZIP
